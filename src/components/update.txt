@@ -1,0 +1,127 @@
+// src/Dashboard.tsx
+
+// ... import lainnya
+import { CheckSquare, ShieldCheck } from 'lucide-react'; // Import icon baru
+import { ApprovalManager } from './components/ApprovalManager'; // Import Component
+
+// ...
+
+export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
+  // ... state lainnya
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [pendingApprovals, setPendingApprovals] = useState(0); // STATE BADGE
+
+  // --- REFRESH DATA (Termasuk hitung Badge) ---
+  const refreshDashboardData = async () => {
+    // ... code lama (ambil dapur, user, dll) ...
+    
+    // FETCH KHUSUS UNTUK BADGE (Semua Role perlu ini)
+    try {
+        const pengujian = await getPengujianList();
+        
+        // Logic Badge: Hitung data 'pending' sesuai role user
+        let count = 0;
+        pengujian.forEach(item => {
+            if (user?.role === 'admin') {
+                // Admin lihat semua yang masih ada pending
+                if (item.status_petugas === 'pending' || item.status_chef === 'pending' || item.status_kepala === 'pending') count++;
+            } else if (user?.role === 'petugas_monitoring' && item.status_petugas === 'pending') {
+                count++;
+            } else if (user?.role === 'kepala_chef' && item.status_chef === 'pending') {
+                count++;
+            } else if (user?.role === 'kepala_dapur' && item.status_kepala === 'pending') {
+                count++;
+            }
+        });
+        setPendingApprovals(count);
+        
+        // ... set state lainnya (totalDapur, dll) ...
+    } catch (e) { console.error(e) }
+  };
+
+  // Panggil refresh saat mount & tab ganti
+  useEffect(() => { refreshDashboardData(); }, [activeTab, user]);
+
+  // --- NAV ITEMS DEFINITION ---
+  const NAV_ITEMS: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard Utama', icon: <LayoutDashboard size={20} /> },
+    
+    // TAB APPROVAL (Semua bisa akses)
+    { id: 'approval', label: 'Persetujuan Data', icon: <ShieldCheck size={20} /> },
+    
+    // TAB MONITORING (Hanya Petugas & Admin)
+    { id: 'monitoring', label: 'Scan Sampel', icon: <Activity size={20} /> },
+    
+    { id: 'pengujian', label: 'Data Pengujian', icon: <ClipboardList size={20} /> },
+    { id: 'dapur', label: 'Unit Dapur', icon: <ChefHat size={20} />, adminOnly: true },
+    { id: 'user', label: 'Pengguna', icon: <Users size={20} />, adminOnly: true },
+  ];
+
+  // Filter Menu Navigasi (Sembunyikan Monitoring utk Kepala Chef/Dapur)
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+      if (item.id === 'monitoring') {
+          // Hanya Petugas & Admin
+          return user?.role === 'admin' || user?.role === 'petugas_monitoring';
+      }
+      if (item.adminOnly) return user?.role === 'admin';
+      return true;
+  });
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex overflow-hidden"> 
+      
+      {/* UPDATE SIDEBAR: Pass visibleNavItems */}
+      <Sidebar 
+        // ... props lain
+        navItems={visibleNavItems} 
+      />
+
+      <div className="flex-1 min-w-0 flex flex-col...">
+        <Header ... />
+
+        <main className="...">
+            {/* ... Judul Page ... */}
+
+            {/* TAB BAR (BUTTONS) - Tambahkan Badge di sini */}
+            <div className="flex space-x-4 overflow-x-auto mb-6 pb-2">
+                {visibleNavItems.map(item => (
+                    <button 
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`...style... relative`} 
+                    >
+                        {item.icon} {item.label}
+                        
+                        {/* BADGE MERAH UNTUK APPROVAL */}
+                        {item.id === 'approval' && pendingApprovals > 0 && (
+                            <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                                {pendingApprovals}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* CONTENT RENDERER */}
+            {activeTab === 'dashboard' && ( ... )}
+            
+            {/* RENDER MONITORING (Cek Role lagi biar aman) */}
+            {activeTab === 'monitoring' && (user?.role === 'admin' || user?.role === 'petugas_monitoring') && (
+                <MonitoringScanner ... />
+            )}
+
+            {activeTab === 'approval' && (
+                <ApprovalManager 
+                    user={user} 
+                    onDataChange={refreshDashboardData} 
+                />
+            )}
+
+            {activeTab === 'pengujian' && <PengujianManager ... />}
+            {/* ... */}
+
+        </main>
+      </div>
+    </div>
+  );
+};
