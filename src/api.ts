@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Sesuaikan URL backend Anda
-const API_URL = 'http://192.168.10.172:8000';
+const API_URL = 'http://localhost:8000';
 
 // --- TYPE DEFINITIONS ---
 
